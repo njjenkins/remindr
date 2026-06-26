@@ -2,7 +2,7 @@
 
 ## Overview
 	
-remindR is a system for automating academic project reminders using R on Mac and Windows. Users can define what kind of reminders they want to obtain, which Gmail address to send the reminders from, and which addresses the reminders will be sent to. This system can help project managers, researchers, research assistants and students keep track of deadlines related to academic projects, reducing the burden of tracking these events manually and the eliminating the possibility of making manual mistakes. remindR uses packages [cronR](https://github.com/bnosac/cronR) (Mac OS X) and [taskscheduleR](https://github.com/bnosac/taskscheduleR) (Windows) to schedule recurring tasks.
+remindR is a system for automating academic project reminders using R on Mac, Linux and Windows. Users can define what kind of reminders they want to obtain, which Gmail address to send the reminders from, and which addresses the reminders will be sent to. This system can help project managers, researchers, research assistants and students keep track of deadlines related to academic projects, reducing the burden of tracking these events manually and the eliminating the possibility of making manual mistakes. remindR uses packages [cronR](https://github.com/bnosac/cronR) (Mac OS X and Linux) and [taskscheduleR](https://github.com/bnosac/taskscheduleR) (Windows) to schedule recurring tasks.
 
 This system can send out four types of reminders:
 
@@ -155,7 +155,7 @@ Once the data for the reminders has been filled out in the Excel files, and the 
 Once the initial set up has been completed, you can add conferences, grants and presentations by modifying the relevant Excel files.
 
 To delete reminders:
-- **Mac OS X**. Run the following commands in R:
+- **Mac OS X and Linux**. Run the following commands in R:
     ```R
     pacman::p_load(cronR)
     cron_ls() # This lists out all the scheduled tasks
