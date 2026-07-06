@@ -61,6 +61,7 @@ grant_dl_freq <- "0, 1, 7, 14"
 define_os <- function() {
   output <- Sys.info()["sysname"]
   current_os <- case_when(output == "Darwin" ~ "mac",
+                          output == "Linux" ~ "linux",
                           output == "Windows" ~ "windows")
   return(current_os)
 }
@@ -94,7 +95,7 @@ if (fut_conf_activate + conf_dl_activate + up_pres_activate + grant_dl_activate)
   # Define path of reminder script.
   reminder_script <- file.path(root_path, "scripts", "2_create_send_reminders.R")
   # Define current OS and set reminders.
-  if (define_os() == "mac") {
+  if (define_os() == "mac" || define_os() == "linux") {
     pacman::p_load(cronR)
     cmd <- cron_rscript(reminder_script)
     cron_add(command = cmd, 
