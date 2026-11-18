@@ -28,6 +28,9 @@ for (c in colnames(current_params)) {
 
 # Time zones to show deadline times in (falls back to this computer's time zone).
 display_zones <- parse_display_timezones(if (exists("display_timezones")) display_timezones else NA)
+# Reminders for deadlines due before this time (in this zone) are sent one day earlier.
+cutoff_time <- if (exists("reminder_cutoff_time") && !is.na(reminder_cutoff_time)) reminder_cutoff_time else "17:00"
+cutoff_tz <- if (exists("reminder_cutoff_tz") && !is.na(reminder_cutoff_tz)) reminder_cutoff_tz else "America/New_York"
 
 # (1.2): Authenticate client secret. #
 gm_auth_configure(path = secret_path)
@@ -126,6 +129,16 @@ for (rem_type in activated_rems) {
     complete <- ifelse(is.na(complete), FALSE, complete)
     if (complete == 0) {
       
+      # When to send reminders. With a deadline time, schedule from the due date in cutoff_tz
+      # (one day earlier if due before cutoff_time); otherwise from the deadline date as before.
+      if (rem_type == "conf_dl" && exists_not_na("deadline_time")) {
+        schedule <- reminder_schedule(deadline, deadline_time, ifelse(exists_not_na("timezone"), timezone, NA),
+                                      cutoff_time, cutoff_tz)
+      } else {
+        schedule <- list(reminder_date = deadline, due_date = deadline, due_label = NA_character_)
+      }
+      reminder_date <- schedule$reminder_date
+      
       # Loop over reminder frequencies.
       sent_email <- 0
       for (f in current_freq) {
@@ -142,7 +155,19 @@ for (rem_type in activated_rems) {
         
         # Define email titles.
         time_until_deadline <- time_until_label(f)
-        if (f == 0) {
+        if (!is.na(schedule$due_label)) {
+          # Deadline with a time: word the title by the real days left until the due date.
+          days_left <- as.numeric(schedule$due_date - todays_date)
+          when_due <- case_when(days_left <= 0 ~ "TODAY", days_left == 1 ~ "TOMORROW",
+                                TRUE ~ str_c("IN ", days_left, " DAYS"))
+          if (f == 0) {
+            rem_title <- str_c("FINAL REMINDER - ", str_to_upper(rem_description), " ", when_due)
+          } else if (days_left < 7) {
+            rem_title <- str_c(str_to_upper(rem_description), " ", when_due)
+          } else {
+            rem_title <- paste("Upcoming", rem_description)
+          }
+        } else if (f == 0) {
           rem_title <- str_c("FINAL REMINDER - ", str_to_upper(rem_description), " TODAY")
         } else if (f >= 1 & f < 7) {
           rem_title <- str_c(str_to_upper(rem_description), " IN ", str_to_upper(clean_days_s(time_until_deadline)))
@@ -154,7 +179,9 @@ for (rem_type in activated_rems) {
         rem_title <- ifelse(rem_type == "fut_conf", "Upcoming predicted conference deadline", rem_title)
         
         # Paste full email title.
-        rem_title <- str_c(proj_name, " //// ", rem_title, ": ", as.character(deadline))
+        rem_title <- str_c(proj_name, " //// ", rem_title, ": ",
+                           ifelse(is.na(schedule$due_label), as.character(deadline),
+                                  str_c(as.character(schedule$due_date), " ", schedule$due_label)))
         
         # Check if reminder exists / has been sent. If doesn't exist, it hasn't been sent.
         notif_varname <- str_c("notif_", str_replace(time_until_deadline, " ", ""))
@@ -163,10 +190,7 @@ for (rem_type in activated_rems) {
         # Send reminders depending on dates and reminder status.
         if (!rem_sent & # (1) reminder not sent yet, 
             sent_email == 0 & # (2) an email for same conference / presentation hasn't been sent in current run, and
-            (deadline - todays_date) >= 0 & (deadline - todays_date) <= f) { # (3) within timeframe to send reminder
-          # (3) within timeframe to send reminder
-          # (deadline
-          # today(tzone = "Australia/Sydney")
+            (reminder_date - todays_date) >= 0 & (reminder_date - todays_date) <= f) { # (3) within timeframe to send reminder
           
           # Assign reminder variable and add to list of variables to export.
           assign(notif_varname, 1)
@@ -247,7 +271,7 @@ for (rem_type in activated_rems) {
           sent_email <- 1
           
           # Alternative: reminder hasn't been sent but deadline still in future -> sent reminder as 0.
-        } else if (!rem_sent & (deadline - todays_date) > f) {
+        } else if (!rem_sent & (reminder_date - todays_date) > f) {
           assign(notif_varname, 0)
         }
       }

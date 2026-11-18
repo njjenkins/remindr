@@ -102,18 +102,47 @@ deadline_instant <- function(deadline_date, time_string, tz_string, default_tz =
   with_tz(force_tz(wall, tz$zone, roll_dst = c("NA", "pre")), "UTC")
 }
 
-# (5): Format an instant in a zone, e.g. "Tuesday, December 1, 2026 at 11:59 PM EST". #
+# (5): An instant as seen in a zone: list(t = clock time, label = "EST"/"AoE (UTC-12)"/...). #
+# For fixed offsets, t is the shifted clock time labelled UTC, so date()/hour() read correctly.
+view_in_zone <- function(instant, tz) {
+  if (!is.na(tz$offset_min)) return(list(t = with_tz(instant, "UTC") + tz$offset_min * 60, label = tz$label))
+  t <- with_tz(instant, tz$zone)
+  label <- if (is.na(tz$label)) format(t, "%Z") else tz$label    # EST/EDT, CST/CDT, ...
+  if (grepl("^[+-]", label)) label <- paste0("UTC", label)       # zones with no abbreviation
+  list(t = t, label = label)
+}
+
+# "9:00 AM EST"
+format_clock <- function(v) paste(sub("^0", "", format(v$t, "%I:%M %p")), v$label)
+
+# Format an instant in a zone, e.g. "Tuesday, December 1, 2026 at 11:59 PM EST".
 format_in_zone <- function(instant, tz) {
-  if (!is.na(tz$offset_min)) {
-    t <- with_tz(instant, "UTC") + tz$offset_min * 60
-    label <- tz$label
-  } else {
-    t <- with_tz(instant, tz$zone)
-    label <- if (is.na(tz$label)) format(t, "%Z") else tz$label    # EST/EDT, CST/CDT, ...
-    if (grepl("^[+-]", label)) label <- paste0("UTC", label)       # zones with no abbreviation
+  v <- view_in_zone(instant, tz)
+  paste0(format(v$t, "%A, %B "), mday(v$t), format(v$t, ", %Y"), " at ", format_clock(v))
+}
+
+# (5b): When to send reminders for a deadline with a time. #
+# The due time is viewed in cutoff_tz. If it is before cutoff_time there, reminders are
+# scheduled one day earlier (so the "final" reminder isn't sent the morning of an early deadline).
+# Returns list(reminder_date, due_date, due_label). Without a usable time, both dates are the
+# deadline date and due_label is NA, i.e. scheduling works as it always has.
+reminder_schedule <- function(deadline_date, time_string, tz_string,
+                              cutoff_time = "17:00", cutoff_tz = "America/New_York") {
+  deadline_date <- as.Date(deadline_date)
+  unchanged <- list(reminder_date = deadline_date, due_date = deadline_date, due_label = NA_character_)
+  instant <- deadline_instant(deadline_date, time_string, tz_string)
+  cutoff_mins <- parse_time_of_day(cutoff_time)
+  ctz <- resolve_timezone(cutoff_tz)
+  if (is.na(cutoff_mins) || is.null(ctz)) {
+    warning("Invalid reminder cutoff '", cutoff_time, "' / '", cutoff_tz, "'; using 17:00 America/New_York.", call. = FALSE)
+    cutoff_mins <- 17L * 60L
+    ctz <- resolve_timezone("America/New_York")
   }
-  paste0(format(t, "%A, %B "), mday(t), format(t, ", %Y"), " at ",
-         sub("^0", "", format(t, "%I:%M %p")), " ", label)
+  if (is.na(instant)) return(unchanged)
+  v <- view_in_zone(instant, ctz)
+  due_date <- as.Date(format(v$t, "%Y-%m-%d"))   # the date on the clock in cutoff_tz
+  before_cutoff <- hour(v$t) * 60L + minute(v$t) < cutoff_mins
+  list(reminder_date = due_date - ifelse(before_cutoff, 1, 0), due_date = due_date, due_label = format_clock(v))
 }
 
 # (6): Parse the comma separated display_timezones parameter. #

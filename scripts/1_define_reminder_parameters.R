@@ -47,6 +47,10 @@ conf_dl_freq <- "0, 1, 7, 14"
 # Use IANA names so daylight saving is handled (EST/EDT, CST/CDT), e.g. "America/New_York, America/Chicago".
 # Abbreviations like "ET, CT" also work. Leave blank ("") to use this computer's time zone.
 display_timezones <- "America/New_York, America/Chicago"
+# Conference deadlines with a deadline_time are scheduled from the due time converted to this zone.
+# If due before reminder_cutoff_time there, all reminders are sent one day earlier.
+reminder_cutoff_time <- "17:00"
+reminder_cutoff_tz <- "America/New_York"
 
 # 6. Parameters for upcoming presentation reminders.
 up_pres_activate <- FALSE
@@ -84,6 +88,8 @@ current_params <- tibble(proj_name = proj_name,
                          conf_dl_emails = conf_dl_emails,
                          conf_dl_freq = conf_dl_freq,
                          display_timezones = display_timezones,
+                         reminder_cutoff_time = reminder_cutoff_time,
+                         reminder_cutoff_tz = reminder_cutoff_tz,
                          # Parameters for upcoming presentation reminders.
                          up_pres_activate = up_pres_activate,
                          up_pres_emails = up_pres_emails,
