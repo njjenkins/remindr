@@ -41,13 +41,15 @@ You need to modify two sets of files to set up the reminder system. First, one t
     4. `complete`: This variable defines whether reminders need to be sent or not. If all scheduled reminders have been sent, it is marked as complete (`complete = 1`). The default value is `complete = 0`. Set `complete = 1` in the Excel document if it is not necessary to send this set of reminders anymore (for example, when completing a submission before the final reminder).
 2. `rem_conference_deadlines.xlsx`: **Conference deadlines**
     1. `deadline`: Conference abstract or paper submission deadline in yyyy_mm_dd text format. **If the deadline is before midnight local time (where the reminders are running), set the deadline as one day before.**
-    2. `notification`: Date notification on admission sent in yyyy_mm_dd text format. Can be left blank.
-    3. `description`: Description of the conference.
-    4. `questions`: Line indicating who to ask conference questions. Can be left blank.
-    5. `submission`: Link to submit abstract or paper to.
-    6. `dead_type`: *abstract* or *paper*.
-    7. `website`: Conference website.
-    8. `complete`: This variable defines whether reminders need to be sent or not. If all scheduled reminders have been sent, it is marked as complete (`complete = 1`). The default value is `complete = 0`. Set `complete = 1` in the Excel document if it is not necessary to send this set of reminders anymore (for example, when completing a submission before the final reminder).
+    2. `deadline_time`: Time the submission is due, in the deadline's own time zone (e.g. *23:59*, *11:59 PM*, *5pm*). Can be left blank. When filled in, reminder emails show the deadline time and the same time converted to the time zones set in `display_timezones` (see [step 4](#4-define-reminder-parameters)).
+    3. `timezone`: Time zone of `deadline_time`. Accepts IANA names (*Europe/Berlin*, *America/Los_Angeles*), common abbreviations (*EST*, *PT*, *CET*, *AoE*) or UTC offsets (*UTC+2*, *GMT-05:00*). Abbreviations follow daylight saving time, so *EST* entered for a July deadline is read as Eastern time (EDT); use an offset such as *UTC-5* for a fixed offset. If left blank, the time is assumed to be in the computer's local time zone.
+    4. `notification`: Date notification on admission sent in yyyy_mm_dd text format. Can be left blank.
+    5. `description`: Description of the conference.
+    6. `questions`: Line indicating who to ask conference questions. Can be left blank.
+    7. `submission`: Link to submit abstract or paper to.
+    8. `dead_type`: *abstract* or *paper*.
+    9. `website`: Conference website.
+    10. `complete`: This variable defines whether reminders need to be sent or not. If all scheduled reminders have been sent, it is marked as complete (`complete = 1`). The default value is `complete = 0`. Set `complete = 1` in the Excel document if it is not necessary to send this set of reminders anymore (for example, when completing a submission before the final reminder).
 3. `rem_upcoming_presentations.xlsx`: **Reminders for upcoming presentations**, including slide submission deadlines
     1. `deadline`: Upcoming presentation date or slide submission deadline in yyyy_mm_dd text format.
     2. `dead_type`: *conference presentation* or *slide submission*.
@@ -148,6 +150,7 @@ Second, general project and specific reminder parameters need to be set in scrip
    - `_activate`: boolean to define whether reminder will be active.
    - `_emails`: comma separated emails to send reminders to (e.g. "john.smith@gmail.com, jane.smith@hotmail.com").
    - `_freq`: comma separated number of days before deadline to send reminders (e.g. "1, 2, 5, 10").
+   - `display_timezones` (conference deadlines only): comma separated time zones to show deadline times in (e.g. "America/New_York, America/Chicago"). Use IANA names so daylight saving time is handled automatically (EST/EDT, CST/CDT). If left blank (""), the computer's time zone is used.
 
 Once the data for the reminders has been filled out in the Excel files, and the parameters set in the first script, you can run `1_define_reminder_parameters.R` to conclude the setup of the reminder system. 
 

@@ -13,6 +13,7 @@
 pacman::p_load(this.path, gmailr, tidyverse, lubridate,
                magrittr, readxl, writexl)
 options(gargle_oauth_email = TRUE)
+source(file.path(this.dir(), "timezone_helpers.R"))
 #########################################################
 
 ############################################################
@@ -24,6 +25,9 @@ current_params <- read_excel(file.path(root_path, "data", "rem_parameters.xlsx")
 for (c in colnames(current_params)) {
   assign(c, current_params %>% pull(c))
 }
+
+# Time zones to show deadline times in (falls back to this computer's time zone).
+display_zones <- parse_display_timezones(if (exists("display_timezones")) display_timezones else NA)
 
 # (1.2): Authenticate client secret. #
 gm_auth_configure(path = secret_path)
@@ -46,7 +50,21 @@ clean_days_s <- function(string) {
          string)
 }
 
-# (1.6): Function that checks variable exists AND is not NA. #
+# (1.6): Function that names the reminder sent f days before the deadline ("today", "2 weeks"...). #
+# Also used for the notif_ column names (e.g. notif_2weeks).
+time_until_label <- function(f) {
+  if (f == 0) {
+    "today"
+  } else if (f >= 1 & f < 7) {
+    str_c(f, " days")
+  } else if (f >= 7 & f < 29) {
+    str_c(round(time_length(days(f), unit = "weeks"), 0), " weeks")
+  } else {
+    str_c(round(time_length(days(f), unit = "months"), 0), " months")
+  }
+}
+
+# (1.7): Function that checks variable exists AND is not NA. #
 exists_not_na <- function(string) {
   if (exists(string)) {
     !is.na(eval(as.name(string))) & eval(as.name(string)) != "NA"
@@ -70,6 +88,10 @@ for (rem_type in activated_rems) {
   current_dataset <- read_excel(file.path(root_path, "data", rem_file)) %>% 
     mutate(deadline = ymd(deadline)) %>% 
     arrange(deadline)
+  # Store deadline times as "HH:MM" text, whatever format they were typed in.
+  if ("deadline_time" %in% colnames(current_dataset)) {
+    current_dataset %<>% mutate(deadline_time = normalize_time_column(deadline_time))
+  }
   
   # Define comma separated emails to send reminders.
   current_emails <- eval(as.name(str_c(rem_type, "_emails")))
@@ -79,6 +101,12 @@ for (rem_type in activated_rems) {
     str_split(",") %>% 
     unlist() %>% 
     as.numeric()
+  
+  # Add a notif_ column for every reminder frequency not tracked yet (NA = not sent yet), so a
+  # new spreadsheet works and every frequency counts toward marking the deadline complete.
+  for (freq_col in str_c("notif_", str_replace(map_chr(current_freq, time_until_label), " ", ""))) {
+    if (!freq_col %in% colnames(current_dataset)) current_dataset[[freq_col]] <- NA_real_
+  }
   
   # Empty dataframe to fill out with results.
   current_results <- tibble()
@@ -113,17 +141,12 @@ for (rem_type in activated_rems) {
                                                  dead_type == "Reminder to submit slides" ~ "conference slide submission deadline"))
         
         # Define email titles.
+        time_until_deadline <- time_until_label(f)
         if (f == 0) {
-          time_until_deadline <- "today"
           rem_title <- str_c("FINAL REMINDER - ", str_to_upper(rem_description), " TODAY")
         } else if (f >= 1 & f < 7) {
-          time_until_deadline <- str_c(f, " days")
           rem_title <- str_c(str_to_upper(rem_description), " IN ", str_to_upper(clean_days_s(time_until_deadline)))
-        } else if (f >= 7 & f < 29) {
-          time_until_deadline <- str_c(round(time_length(days(f), unit = "weeks"), 0), " weeks")
-          rem_title <- paste("Upcoming", rem_description)
-        } else if (f >= 29) {
-          time_until_deadline <- str_c(round(time_length(days(f), unit = "months"), 0), " months")
+        } else {
           rem_title <- paste("Upcoming", rem_description)
         }
         
@@ -160,12 +183,19 @@ for (rem_type in activated_rems) {
                               "</body></html>")
           } else if (rem_type == "conf_dl") {
             # CONFERENCE DEADLINE REMINDERS
+            # Deadline time converted to the display time zones (empty if no time given).
+            time_html <- ifelse(exists_not_na("deadline_time"),
+                                deadline_time_html(deadline, deadline_time,
+                                                   ifelse(exists_not_na("timezone"), timezone, NA),
+                                                   display_zones),
+                                "")
             rem_text <- str_c("<html><body>",
                               "Hello, <br><br>",
                               "This is an automated reminder that the ", description, " has ",
                               case_when(str_detect(str_to_lower(dead_type), "abstract") ~ "an abstract",
                                         str_detect(str_to_lower(dead_type), "paper") ~ "a paper"),
                               " submission deadline coming up on ", deadline, ". <br><br>",
+                              time_html,
                               "Please remember to submit the ", dead_type, " to ", submission, " as soon as possible. <br><br>",
                               ifelse(exists_not_na("website"), str_c("For more information, please refer to ", website, ". <br><br>"), ""),
                               ifelse(exists_not_na("questions"), str_c("For any questions, please contact ", questions, ". <br><br>"), ""),
@@ -213,7 +243,7 @@ for (rem_type in activated_rems) {
           gm_send_message(email_body)
           
           # Flag email sent.
-          print(paste(rem, "email sent"))
+          print(paste(rem_type, "email sent"))
           sent_email <- 1
           
           # Alternative: reminder hasn't been sent but deadline still in future -> sent reminder as 0.

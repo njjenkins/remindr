@@ -43,6 +43,10 @@ fut_conf_freq <- "90, 120, 150"
 conf_dl_activate <- FALSE
 conf_dl_emails <- "emails"
 conf_dl_freq <- "0, 1, 7, 14"
+# Comma separated time zones to show conference deadline times in (when a deadline_time is given).
+# Use IANA names so daylight saving is handled (EST/EDT, CST/CDT), e.g. "America/New_York, America/Chicago".
+# Abbreviations like "ET, CT" also work. Leave blank ("") to use this computer's time zone.
+display_timezones <- "America/New_York, America/Chicago"
 
 # 6. Parameters for upcoming presentation reminders.
 up_pres_activate <- FALSE
@@ -79,6 +83,7 @@ current_params <- tibble(proj_name = proj_name,
                          conf_dl_activate = conf_dl_activate,
                          conf_dl_emails = conf_dl_emails,
                          conf_dl_freq = conf_dl_freq,
+                         display_timezones = display_timezones,
                          # Parameters for upcoming presentation reminders.
                          up_pres_activate = up_pres_activate,
                          up_pres_emails = up_pres_emails,
