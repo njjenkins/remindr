@@ -145,13 +145,22 @@ for (rem_type in activated_rems) {
         
         # Define time until deadline and reminder title.
         dead_type <- ifelse(exists_not_na("dead_type"), dead_type, "")
+        # Presentation reminder kind, matched by keyword so both "slide submission" and
+        # "Reminder to submit slides" work: slides, paper, or a general presentation reminder.
+        pres_kind <- case_when(str_detect(str_to_lower(dead_type), "slide") ~ "slides",
+                               str_detect(str_to_lower(dead_type), "paper") ~ "paper",
+                               TRUE ~ "presentation")
+        # Grant reminder kind: dead_type in lower case without a trailing " reminder", so
+        # "deliverable", "Deliverable reminder" and other types like "report" all work.
+        grant_kind <- str_trim(str_remove(str_to_lower(dead_type), " reminder$"))
+        grant_kind <- ifelse(grant_kind == "", "submission", grant_kind)
         rem_description <- case_when(rem_type == "fut_conf" ~ "predicted deadline",
                                      rem_type == "conf_dl" ~ "paper submission deadline",
-                                     rem_type == "grant_dl" ~ paste("grant", dead_type, "deadline"),
+                                     rem_type == "grant_dl" ~ paste("grant", grant_kind, "deadline"),
                                      rem_type == "up_pres" ~ 
-                                       case_when(dead_type == "General presentation reminder" ~ "conference presentation",
-                                                 dead_type == "Reminder to submit paper" ~ "conference paper submission deadline",
-                                                 dead_type == "Reminder to submit slides" ~ "conference slide submission deadline"))
+                                       case_when(pres_kind == "presentation" ~ "conference presentation",
+                                                 pres_kind == "paper" ~ "conference paper submission deadline",
+                                                 pres_kind == "slides" ~ "conference slide submission deadline"))
         
         # Define email titles.
         time_until_deadline <- time_until_label(f)
@@ -200,8 +209,10 @@ for (rem_type in activated_rems) {
             # FUTURE CONFERENCE REMINDERS
             rem_text <- str_c("<html><body>",
                               "Hello, <br><br>",
-                              "This is an automated reminder that the ", description, " is predicted to take place on ", conf_date, ". <br><br>",
-                              "Please remember to check the website for up to date conference information: ", website, " <br><br>",
+                              "This is an automated reminder that the ", description, " is predicted to take place on ", deadline, ". <br><br>",
+                              ifelse(exists_not_na("website"),
+                                     str_c("Please remember to check the website for up to date conference information: ", website, " <br><br>"),
+                                     "Please remember to check for up to date conference information. <br><br>"),
                               "Best, <br><br>",
                               name_from,
                               "</body></html>")
@@ -230,12 +241,11 @@ for (rem_type in activated_rems) {
             rem_text <- str_c("<html><body>",
                               "Hello, <br><br>",
                               "This is an automated reminder that the ", description, " is going to take place soon. <br><br>",
-                              case_when(dead_type == "General presentation reminder" ~
-                                          "No further action is needed at this time. <br><br>",
-                                        dead_type == "Reminder to submit paper" ~
-                                          "Please remember to submit the paper to ", submission, " as soon as possible. <br><br>",
-                                        dead_type == "Reminder to submit slides" ~
-                                          "Please remember to submit the slides to ", submission, " as soon as possible. <br><br>"),
+                              ifelse(pres_kind == "presentation",
+                                     "No further action is needed at this time. <br><br>",
+                                     str_c("Please remember to submit the ", pres_kind,
+                                           ifelse(exists_not_na("submission"), str_c(" to ", submission), ""),
+                                           " as soon as possible. <br><br>")),
                               ifelse(exists_not_na("website"), str_c("For more information, please refer to ", website, ". <br><br>"), ""),
                               "Best, <br><br>",
                               name_from,
@@ -245,12 +255,14 @@ for (rem_type in activated_rems) {
             rem_text <- str_c("<html><body>",
                               "Hello, <br><br>",
                               "This is an automated reminder that the ", description,  " has ",
-                              case_when(dead_type == "Deliverable reminder" ~ "a deliverable",
-                                        dead_type == "Proposal reminder" ~ "a proposal"),
-                              "submission deadline coming up on ", deadline, ". <br><br>",
-                              ifelse(!is.na(details) & details != "",
+                              ifelse(str_detect(grant_kind, "^[aeiou]"), "an ", "a "), grant_kind,
+                              ifelse(grant_kind == "submission", "", " submission"),
+                              " deadline coming up on ", deadline, ". <br><br>",
+                              ifelse(exists_not_na("details") && details != "",
                                      str_c("This grant requires the following: <br><br>", details, "<br><br>"), ""),
-                              "Please remember to submit the ", str_to_lower(str_remove(dead_type, " reminder")), " to ", submission, " as soon as possible. <br><br>",
+                              "Please remember to submit", ifelse(grant_kind == "submission", "", str_c(" the ", grant_kind)),
+                              ifelse(exists_not_na("submission"), str_c(" to ", submission), ""),
+                              " as soon as possible. <br><br>",
                               ifelse(exists_not_na("questions"), str_c("For any questions, please contact ", questions, ". <br><br>"), ""),
                               "Best, <br><br>",
                               name_from,
